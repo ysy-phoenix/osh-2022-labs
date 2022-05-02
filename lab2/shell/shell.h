@@ -3,6 +3,7 @@
 
 #define WRITE_END 1 // pipe write end
 #define READ_END 0  // pipe read end
+#define INT 768
 
 inline std::string &leftTrim(std::string &s, const char *t = " \t\n\r\f\v");
 inline std::string &rightTrim(std::string &s, const char *t = " \t\n\r\f\v");
@@ -12,10 +13,22 @@ int exeCd(std::vector<std::string> args);
 int exePwd(std::vector<std::string> args);
 int exeExport(std::vector<std::string> args);
 int exeExit(std::vector<std::string> args);
+int exeHistory(std::vector<std::string> args);
+int exeNthCmd(std::vector<std::string> args);
+int exeLastCmd(std::vector<std::string> args);
 int exeBuiltinCmd(std::vector<std::string> args);
 void exeSingleCmd(std::vector<std::string> args);
 void exePipeCmd(std::vector<std::string> args);
 void redirect(std::vector<std::string> &args);
+void readHistory(std::vector<std::string> &history);
+void outHistory(int n);
+
+pid_t _pid;
+std::vector<std::string> history;
+std::string lastCmd;
+std::string nthCmd;
+bool isLastCmd;
+bool isNthCmd;
 
 // trim from left
 inline std::string &leftTrim(std::string &s, const char *t) {
@@ -109,6 +122,8 @@ int exeExport(std::vector<std::string> args) {
 }
 
 int exeExit(std::vector<std::string> args) {
+    std::cout << "exit\n";
+
     if (args.size() <= 1) {
         exit(0);
     }
@@ -120,17 +135,85 @@ int exeExit(std::vector<std::string> args) {
 
     // 转换失败
     if (!code_stream.eof() || code_stream.fail()) {
-        std::cout << "Invalid exit code\n";
-        return 0;
+        std::cout << "shell: " << args[1] << ": numeric argument required\n";
+        exit(2);
     }
-
     exit(code);
+}
+
+void readHistory(std::vector<std::string> &history) {
+    std::string homePath = getenv("HOME");
+    std::fstream historyFile(homePath + "/.shell_history", std::ios::in);
+    if (!historyFile) {
+        std::cout << "open history failed!" << std::endl;
+        exit(1);
+    }
+    std::string line;
+    while (getline(historyFile, line)) {
+        history.push_back(line);
+    }
+    historyFile.close();
+}
+
+void outHistory(int n) {
+    int start = (n < history.size()) ? (history.size() - n) : (0);
+    for (int i = start; i < history.size(); ++i) {
+        std::cout << std::right << std::setw(5) << i + 1;
+        std::cout << "  " << history[i] << "\n";
+    }
+}
+
+int exeHistory(std::vector<std::string> args) {
+    std::string filePath = getenv("HOME");
+    filePath += std::string("/.shell_history");
+    std::ifstream historyFile(filePath, std::ios::in);
+    std::string line;
+    if (args.size() == 1) {
+        outHistory(history.size());
+    } else if (args.size() == 2) {
+        std::stringstream nstream(args[1]);
+        int n = 0;
+        nstream >> n;
+        if (!nstream.eof() || nstream.fail()) {
+            std::cout << "shell: history: " << args[1] << ": numeric argument required\n";
+        } else if (n < 0) {
+            std::cout << "shell: history:" << n << "invalid option\n";
+        } else {
+            outHistory(n);
+        }
+    } else {
+        std::cout << "shell: history: too many arguments!\n";
+    }
+    return 0;
+}
+
+int exeNthCmd(std::vector<std::string> args) {
+    std::string num = args[0].substr(1);
+    std::stringstream nstream(num);
+    int n = 0;
+    nstream >> n;
+    if (!nstream.eof() || nstream.fail()) {
+        std::cout << "shell: " << args[0] << ": event not found\n";
+    } else if (n == 0 || n > history.size()) {
+        std::cout << "shell: " << args[0] << ": event not found\n";
+    } else {
+        n = (n < 0) ? (history.size() + n) : (n - 1);
+        nthCmd = history[n];
+        isNthCmd = true;
+        std::cout << nthCmd << std::endl;
+    }
+    return 0;
+}
+
+int exeLastCmd(std::vector<std::string> args) {
+    std::cout << lastCmd << std::endl;
+    isLastCmd = true;
     return 0;
 }
 
 int exeBuiltinCmd(std::vector<std::string> args) {
-    // 没有可处理的命令
     if (args.empty()) {
+        // 没有可处理的命令
         return 0;
     } else if (args[0] == "cd") {
         // 更改工作目录为目标目录
@@ -144,6 +227,13 @@ int exeBuiltinCmd(std::vector<std::string> args) {
     } else if (args[0] == "exit") {
         // 退出
         exeExit(args);
+    } else if (args[0] == "history") {
+        // 历史
+        exeHistory(args);
+    } else if (args[0] == "!!") {
+        exeLastCmd(args);
+    } else if (args[0].substr(0, 1) == "!") {
+        exeNthCmd(args);
     } else {
         // 不是内置指令
         return -1;
@@ -260,5 +350,13 @@ void redirect(std::vector<std::string> &args) {
     }
     args.erase(remove(args.begin(), args.end(), ""), args.end());
 } // end orient if
+
+void handler(int signum) {
+    if (_pid == 0) {
+        exit(3);
+    } else {
+        std::cout << std::endl;
+    }
+}
 
 #endif
