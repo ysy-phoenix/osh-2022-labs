@@ -3,7 +3,6 @@
 
 #define WRITE_END 1 // pipe write end
 #define READ_END 0  // pipe read end
-#define INT 768
 
 inline std::string &leftTrim(std::string &s, const char *t = " \t\n\r\f\v");
 inline std::string &rightTrim(std::string &s, const char *t = " \t\n\r\f\v");
@@ -16,6 +15,7 @@ int exeExit(std::vector<std::string> args);
 int exeHistory(std::vector<std::string> args);
 int exeNthCmd(std::vector<std::string> args);
 int exeLastCmd(std::vector<std::string> args);
+int exeEcho(std::vector<std::string> args);
 int exeBuiltinCmd(std::vector<std::string> args);
 void exeSingleCmd(std::vector<std::string> args);
 void exePipeCmd(std::vector<std::string> args);
@@ -25,10 +25,10 @@ void outHistory(int n);
 
 pid_t _pid;
 std::vector<std::string> history;
-std::string lastCmd;
 std::string nthCmd;
 bool isLastCmd;
 bool isNthCmd;
+bool isINT;
 
 // trim from left
 inline std::string &leftTrim(std::string &s, const char *t) {
@@ -177,7 +177,7 @@ int exeHistory(std::vector<std::string> args) {
         if (!nstream.eof() || nstream.fail()) {
             std::cout << "shell: history: " << args[1] << ": numeric argument required\n";
         } else if (n < 0) {
-            std::cout << "shell: history:" << n << "invalid option\n";
+            std::cout << "shell: history: " << n << ": invalid option\n";
         } else {
             outHistory(n);
         }
@@ -206,10 +206,36 @@ int exeNthCmd(std::vector<std::string> args) {
 }
 
 int exeLastCmd(std::vector<std::string> args) {
-    std::cout << lastCmd << std::endl;
+    std::cout << history.back() << std::endl;
     isLastCmd = true;
     return 0;
 }
+
+int exeEcho(std::vector<std::string> args) {
+    if (args[1] == "$0") {
+        char buf[PATH_MAX];
+        size_t len = readlink("/proc/self/exe", buf, PATH_MAX);
+        buf[len] = '\0';
+        std::string path = buf;
+        std::cout << buf << "\n";
+        return 0;
+    } else if (args[1] == "$SHELL") {
+        std::string shell = getenv("SHELL");
+        std::cout << shell << std::endl;
+        return 0;
+    } else if (args[1].substr(0, 1) == "~") {
+        if (args[1].size() == 1) {
+            std::string home = getenv("HOME");
+            std::cout << home << std::endl;
+        } else if (args[1].substr(1) == "root") {
+            std::cout << "/root\n";
+        } else if (args[1].substr(1) == "bin") {
+            std::cout << "/bin\n";
+        }
+        return 0;
+    }
+    return -1;
+} // end echo if
 
 int exeBuiltinCmd(std::vector<std::string> args) {
     if (args.empty()) {
@@ -234,6 +260,8 @@ int exeBuiltinCmd(std::vector<std::string> args) {
         exeLastCmd(args);
     } else if (args[0].substr(0, 1) == "!") {
         exeNthCmd(args);
+    } else if (args[0] == "echo") {
+        return exeEcho(args);
     } else {
         // 不是内置指令
         return -1;
@@ -352,6 +380,7 @@ void redirect(std::vector<std::string> &args) {
 } // end orient if
 
 void handler(int signum) {
+    isINT = true;
     if (_pid == 0) {
         exit(3);
     } else {

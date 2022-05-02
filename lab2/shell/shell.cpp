@@ -11,13 +11,16 @@
 // POSIX API
 #include <unistd.h>
 // wait
-#include <algorithm>
-#include <cstdlib>
-#include <fcntl.h>
 #include <sys/wait.h>
+// find
+#include <algorithm>
+// getenv
+#include <cstdlib>
+// open
+#include <fcntl.h>
 // file
-
 #include <fstream>
+// setw
 #include <iomanip>
 
 #include "shell.h"
@@ -26,23 +29,22 @@ int main() {
     // 不同步 iostream 和 cstdio 的 buffer
     std::ios::sync_with_stdio(false);
 
-    // init
-    int status;
-    lastCmd = "";
-    nthCmd = "";
-    isLastCmd = false;
-    isNthCmd = false;
-    history.clear();
-
-    std::string homePath = getenv("HOME");
-    std::fstream historyFile(homePath + "/.shell_history", std::ios::app);
-    if (!historyFile) {
-        std::cout << "open history failed!" << std::endl;
-        exit(1);
-    }
-    readHistory(history);
-
     while (true) {
+        int status;
+        nthCmd = "";
+        isLastCmd = false;
+        isNthCmd = false;
+        isINT = false;
+        history.clear();
+
+        std::string homePath = getenv("HOME");
+        std::fstream historyFile(homePath + "/.shell_history", std::ios::app);
+        if (!historyFile) {
+            std::cout << "open history failed!" << std::endl;
+            exit(1);
+        }
+        readHistory(history);
+
         _pid = fork();
         if (_pid < 0) {
             std::cout << "fork failed\n";
@@ -64,16 +66,20 @@ int main() {
                     if (path == nullptr) {
                         exit(EXIT_FAILURE);
                     } else {
-                        std::cout << "\e[1;44m"
-                                  << "# " << path << " "
-                                  << "\e[0m"
-                                  << " ";
+                        std::string user = getlogin();
+                        char computer[255];
+                        gethostname(computer, 255);
+                        std::string host = computer;
+                        std::cout << "\e[1;32m" << user << "@" << host << "\e[0m";
+                        std::cout << ":";
+                        std::cout << "\e[1;34m" << cwd << "\e[0m";
+                        std::cout << "$ ";
                     }
                 }
 
                 // cmd
                 if (isLastCmd) {
-                    cmd = lastCmd;
+                    cmd = history.back();
                     isLastCmd = false;
                 } else if (isNthCmd) {
                     cmd = nthCmd;
@@ -92,18 +98,9 @@ int main() {
                 }
 
                 // history
-                if (cmd != lastCmd && cmd.substr(0, 1) != "!") {
+                if (cmd != history.back() && cmd.substr(0, 1) != "!") {
                     historyFile << cmd << std::endl;
                     history.push_back(cmd);
-                }
-
-                // lastCmd
-                if (cmd.substr(0, 1) != "!") {
-                    if (lastCmd != "") {
-                        lastCmd = cmd;
-                    } else {
-                        lastCmd = history.back();
-                    }
                 }
 
                 // 按管道符拆解命令行
@@ -145,9 +142,9 @@ int main() {
         } else {
             signal(SIGINT, handler);
             waitpid(_pid, &status, 0);
-            if (status != INT) {
+            if (!isINT) {
                 historyFile.close();
-                exit(status);
+                return status / 256;
             } else {
                 continue;
             }
