@@ -13,8 +13,6 @@ int exePwd(std::vector<std::string> args);
 int exeExport(std::vector<std::string> args);
 int exeExit(std::vector<std::string> args);
 int exeHistory(std::vector<std::string> args);
-int exeNthCmd(std::vector<std::string> args);
-int exeLastCmd(std::vector<std::string> args);
 int exeEcho(std::vector<std::string> args);
 int exeBuiltinCmd(std::vector<std::string> args);
 void exeSingleCmd(std::vector<std::string> args);
@@ -25,9 +23,6 @@ void outHistory(int n);
 
 pid_t _pid;
 std::vector<std::string> history;
-std::string nthCmd;
-bool isLastCmd;
-bool isNthCmd;
 bool isINT;
 
 // trim from left
@@ -187,30 +182,6 @@ int exeHistory(std::vector<std::string> args) {
     return 0;
 }
 
-int exeNthCmd(std::vector<std::string> args) {
-    std::string num = args[0].substr(1);
-    std::stringstream nstream(num);
-    int n = 0;
-    nstream >> n;
-    if (!nstream.eof() || nstream.fail()) {
-        std::cout << "shell: " << args[0] << ": event not found\n";
-    } else if (n == 0 || n > history.size()) {
-        std::cout << "shell: " << args[0] << ": event not found\n";
-    } else {
-        n = (n < 0) ? (history.size() + n) : (n - 1);
-        nthCmd = history[n];
-        isNthCmd = true;
-        std::cout << nthCmd << std::endl;
-    }
-    return 0;
-}
-
-int exeLastCmd(std::vector<std::string> args) {
-    std::cout << history.back() << std::endl;
-    isLastCmd = true;
-    return 0;
-}
-
 int exeEcho(std::vector<std::string> args) {
     if (args[1] == "$0") {
         char buf[PATH_MAX];
@@ -256,10 +227,6 @@ int exeBuiltinCmd(std::vector<std::string> args) {
     } else if (args[0] == "history") {
         // 历史
         exeHistory(args);
-    } else if (args[0] == "!!") {
-        exeLastCmd(args);
-    } else if (args[0].substr(0, 1) == "!") {
-        exeNthCmd(args);
     } else if (args[0] == "echo") {
         return exeEcho(args);
     } else {
@@ -342,7 +309,7 @@ void redirect(std::vector<std::string> &args) {
     std::vector<std::string>::iterator it;
     if ((it = find(args.begin(), args.end(), ">")) != args.end()) {
         std::string file = *(it + 1);
-        int fd = open(&file[0], O_RDWR);
+        int fd = open(&file[0], O_RDWR | O_CREAT, 0664);
         if (fd == -1) {
             std::cout << file << ": No such file or directory\n";
             exit(2);
@@ -354,7 +321,7 @@ void redirect(std::vector<std::string> &args) {
     }
     if ((it = find(args.begin(), args.end(), ">>")) != args.end()) {
         std::string file = *(it + 1);
-        int fd = open(&file[0], O_RDWR | O_APPEND);
+        int fd = open(&file[0], O_RDWR | O_APPEND | O_CREAT, 0664);
         if (fd == -1) {
             std::cout << file << ": No such file or directory\n";
             exit(2);

@@ -31,9 +31,6 @@ int main() {
 
     while (true) {
         int status;
-        nthCmd = "";
-        isLastCmd = false;
-        isNthCmd = false;
         isINT = false;
         history.clear();
 
@@ -55,36 +52,28 @@ int main() {
 
             while (true) {
 
-                if (!isLastCmd && !isNthCmd) {
-                    // 打印提示符
-                    std::string cwd;
+                // 打印提示符
+                std::string cwd;
 
-                    // 预先分配好空间
-                    cwd.resize(PATH_MAX);
+                // 预先分配好空间
+                cwd.resize(PATH_MAX);
 
-                    const char *path = getcwd(&cwd[0], PATH_MAX);
-                    if (path == nullptr) {
-                        exit(EXIT_FAILURE);
-                    } else {
-                        std::string user = getlogin();
-                        char computer[255];
-                        gethostname(computer, 255);
-                        std::string host = computer;
-                        std::cout << "\e[1;32m" << user << "@" << host << "\e[0m";
-                        std::cout << ":";
-                        std::cout << "\e[1;34m" << cwd << "\e[0m";
-                        std::cout << "$ ";
-                    }
+                const char *path = getcwd(&cwd[0], PATH_MAX);
+                if (path == nullptr) {
+                    exit(EXIT_FAILURE);
+                } else {
+                    std::string user = getlogin();
+                    char computer[255];
+                    gethostname(computer, 255);
+                    std::string host = computer;
+                    std::cout << "\e[1;32m" << user << "@" << host << "\e[0m";
+                    std::cout << ":";
+                    std::cout << "\e[1;34m" << cwd << "\e[0m";
+                    std::cout << "$ ";
                 }
 
                 // cmd
-                if (isLastCmd) {
-                    cmd = history.back();
-                    isLastCmd = false;
-                } else if (isNthCmd) {
-                    cmd = nthCmd;
-                    isNthCmd = false;
-                } else if (std::cin.peek() != EOF) {
+                if (std::cin.peek() != EOF) {
                     // 读入一行。std::getline 结果不包含换行符。
                     std::getline(std::cin, cmd);
                     cmd = trim(cmd);
@@ -97,14 +86,51 @@ int main() {
                     continue;
                 }
 
+                // 按管道符拆解命令行
+                std::vector<std::string> cmds = split(cmd, "|");
+
+                // 处理 !! 和 !n
+                bool flag = false;
+                cmd = "";
+                for (auto i = 0; i < cmds.size(); ++i) {
+                    std::string &command = cmds[i];
+                    if (command.substr(0, 1) == "!") {
+                        flag = true;
+                        if (command.substr(1, 1) == "!") {
+                            command = history.back();
+                        } else {
+                            std::string num = command.substr(1);
+                            std::stringstream nstream(num);
+                            int n = 0;
+                            nstream >> n;
+                            if (nstream.fail()) {
+                                std::cout << "shell: " << command << ": event not found\n";
+                            } else if (n == 0 || n > history.size()) {
+                                std::cout << "shell: " << command << ": event not found\n";
+                            } else {
+                                n = (n < 0) ? (history.size() + n) : (n - 1);
+                                if (n < 0) {
+                                    std::cout << "shell: " << command << ": event not found\n";
+                                }
+                                command = history[n];
+                            }
+                        }
+                    }
+                    cmd += command;
+                    if (i < cmds.size() - 1) {
+                        cmd += " | ";
+                    }
+                }
+
+                if (flag) {
+                    std::cout << cmd << std::endl;
+                }
+
                 // history
-                if (cmd != history.back() && cmd.substr(0, 1) != "!") {
+                if (history.empty() || (cmd != history.back())) {
                     historyFile << cmd << std::endl;
                     history.push_back(cmd);
                 }
-
-                // 按管道符拆解命令行
-                std::vector<std::string> cmds = split(cmd, "|");
 
                 if (cmds.size() == 0) {
                     continue;
