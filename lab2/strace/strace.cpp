@@ -16,13 +16,6 @@
 #include <sys/ptrace.h>
 #include <syscall.h>
 
-#define FATAL(...)                                                                                                     \
-    do {                                                                                                               \
-        fprintf(stderr, "strace: " __VA_ARGS__);                                                                       \
-        fputc('\n', stderr);                                                                                           \
-        exit(EXIT_FAILURE);                                                                                            \
-    } while (0)
-
 int main(int argc, char **argv) {
     if (argc <= 1) {
         fprintf(stderr, "too few arguments!");
