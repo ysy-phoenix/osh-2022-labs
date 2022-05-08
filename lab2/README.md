@@ -8,6 +8,14 @@
 
 `echo $SHELL`
 
+`echo $0`
+
+`echo ~`
+
+`echo ~bin`
+
+其中 Ctrl-D，在没有输入的时候会直接 exit，若输入了一个命令，例如 ls，然后连续按两次 Ctrl-D 会先执行玩 ls，然后 exit（若只按一次 Ctrl-D 相当与截断输入，继续输入不影响）。
+
 ## history
 
 history 相关的实现基本与 bash 功能等同。
