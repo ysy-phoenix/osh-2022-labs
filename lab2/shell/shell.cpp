@@ -82,6 +82,10 @@ int main() {
                     exit(0);
                 }
 
+                if (std::cin.eof()) {
+                    std::cout << std::endl;
+                }
+
                 if (cmd == "") {
                     continue;
                 }

@@ -88,7 +88,7 @@ int exePwd(std::vector<std::string> args) {
     if (ret == nullptr) {
         std::cout << "pwd failed\n";
     } else {
-        std::cout << ret << "\n";
+        std::cout << ret << std::endl;
     }
     return 0;
 }
