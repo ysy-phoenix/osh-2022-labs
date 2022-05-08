@@ -1,20 +1,13 @@
-// #define _POSIX_C_SOURCE 200112L
-
-/* C standard library */
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
-// POSIX
+#include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
-#include <unistd.h>
-
-// Linux
-#include <sys/ptrace.h>
 #include <syscall.h>
+#include <unistd.h>
 
 int main(int argc, char **argv) {
     if (argc <= 1) {
