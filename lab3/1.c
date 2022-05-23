@@ -6,21 +6,27 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define BUFFER_LENGTH 1024
-#define MSG_LENGTH 1200000
+#define BUFFER_SIZE 1024
 
 struct Pipe {
     int fd_send;
     int fd_recv;
 };
 
-void sendSingleMsg(char *message, int len, int fd) {
+void sendSingleMsg(char *message, int len, int fd, int flag) {
+    // prompt
+    char prompt[9] = "Message:";
+    if (flag == 1) {
+        send(fd, prompt, 8, 0);
+    }
+
+    // send message
     int start = 0;
     while (len > 0) {
         int sendLen = send(fd, message + start, len, 0);
         if (sendLen <= 0) {
             perror("send");
-            exit(-1);
+            exit(1);
         }
         len -= sendLen;
         start += sendLen;
@@ -29,14 +35,14 @@ void sendSingleMsg(char *message, int len, int fd) {
 
 void *handle_chat(void *data) {
     struct Pipe *pipe = (struct Pipe *)data;
-    char message[MSG_LENGTH] = "Message: ";
-    char buffer[BUFFER_LENGTH];
+    char buffer[BUFFER_SIZE];
+    char message[BUFFER_SIZE];
     ssize_t len;
-    int index = 8;
+    int flag = 1;
 
     // handle chat
     while (1) {
-        len = recv(pipe->fd_send, buffer, BUFFER_LENGTH, 0);
+        len = recv(pipe->fd_send, buffer, BUFFER_SIZE, 0);
         if (len <= 0) {
             break;
         }
@@ -44,21 +50,22 @@ void *handle_chat(void *data) {
         // split and send
         int pos = 0;
         for (int i = 0; i < len; ++i) {
-            if (buffer[i] == '\n' || buffer[i] == EOF) {
-                int singleMsgLen = i - pos + 1;
-                strncpy(message + index, buffer + pos, singleMsgLen);
-                int sendMsgLen = index + singleMsgLen;
-                sendSingleMsg(message, sendMsgLen, pipe->fd_recv);
+            if (buffer[i] == '\n') {
+                int sendMsgLen = i - pos + 1;
+                strncpy(message, buffer + pos, sendMsgLen);
+                sendSingleMsg(message, sendMsgLen, pipe->fd_recv, flag);
+                flag = 1;
                 pos = i + 1;
-                index = 8;
             }
         }
 
-        // copy left message
+        // send left message
         if (pos != len) {
             int length = len - pos;
-            strncpy(message + index, buffer + pos, length);
-            index += length;
+            strncpy(message, buffer + pos, length);
+            message[length] = '\n';
+            sendSingleMsg(message, length + 1, pipe->fd_recv, flag);
+            flag = 0;
         }
     }
     return NULL;
