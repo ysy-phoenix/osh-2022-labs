@@ -11,15 +11,18 @@
 #define QUEUE_SIZE 64
 #define MSG_SIZE 1200000
 
+// user
 struct User {
     int fd;
     int uid;
+    int head;
 };
-int client[MAX_USER_NUM];
 int flag[MAX_USER_NUM] = {0};
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+// pthread_mutex_t head_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// message
 struct Message {
     char msg[MSG_SIZE];
     int len;
@@ -42,14 +45,6 @@ void sendSingleMsg(char *message, int len, int fd) {
     }
 }
 
-void sendtoAll(char *message, int uid, int len) {
-    for (int i = 0; i < MAX_USER_NUM; ++i) {
-        if (flag[i] && i != uid) {
-            sendSingleMsg(message, len, client[i]);
-        }
-    }
-}
-
 void sendtoHost(char *message, int uid, int len) {
     pthread_mutex_lock(&mutex);
     struct Message *sendMsg = &message_queue[tail];
@@ -63,9 +58,27 @@ void sendtoHost(char *message, int uid, int len) {
 void *handle_host(void *data) {
     while (1) {
         if (head != tail) {
-            struct Message *sendMsg = &message_queue[head];
-            sendtoAll(sendMsg->msg, sendMsg->uid, sendMsg->len);
+            pthread_mutex_lock(&mutex);
             head = (head + 1) % QUEUE_SIZE;
+            pthread_mutex_unlock(&mutex);
+        }
+    }
+    return NULL;
+}
+
+void *sendtoClient(void *data) {
+    struct User *user = (struct User *)data;
+    while (1) {
+        if (!flag[user->uid]) {
+            return NULL;
+        }
+        if (user->head != tail) {
+            struct Message *sendMsg = &message_queue[user->head];
+            user->head = ((user->head) + 1) % QUEUE_SIZE;
+            if (user->uid == sendMsg->uid) {
+                continue;
+            }
+            sendSingleMsg(sendMsg->msg, sendMsg->len, user->fd);
         }
     }
     return NULL;
@@ -87,7 +100,7 @@ void *handle_chat(void *data) {
         // close client
         if (len <= 0) {
             flag[user->uid] = 0;
-            close(client[user->uid]);
+            close(user->fd);
             return NULL;
         }
         // split and send
@@ -158,7 +171,7 @@ int main(int argc, char **argv) {
     pthread_t host_thread;
     pthread_create(&host_thread, NULL, handle_host, NULL);
 
-    // client
+    // user
     while (1) {
         int fd_new = accept(fd, NULL, NULL);
         if (fd_new == -1) {
@@ -166,15 +179,21 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        // new client
+        // new user
         int cnt;
         for (cnt = 0; cnt < MAX_USER_NUM; cnt++) {
             if (flag[cnt] == 0) {
                 flag[cnt] = 1;
-                client[cnt] = fd_new;
+
+                // new user
                 user[cnt].fd = fd_new;
                 user[cnt].uid = cnt;
+                pthread_mutex_lock(&mutex);
+                user[cnt].head = head;
+                pthread_mutex_unlock(&mutex);
+
                 pthread_create(&thread[cnt], NULL, handle_chat, (void *)&user[cnt]);
+                pthread_create(&thread[cnt], NULL, sendtoClient, (void *)&user[cnt]);
                 break;
             }
         }
