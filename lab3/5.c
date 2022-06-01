@@ -18,6 +18,7 @@
 
 void new_client(int fd);
 int find_user(int fd);
+int add_prompt(char *buffer, int len, char *prompt);
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags);
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t size, unsigned flags);
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t size, unsigned flags);
@@ -38,7 +39,7 @@ typedef struct conn_info {
 
 char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
 int group_id = 1337;
-char message[MAX_MESSAGE_LEN] = {0};
+// char message[MAX_MESSAGE_LEN] = {0};
 int flag[MAX_CONNECTIONS] = {0};
 int client[MAX_CONNECTIONS] = {0};
 
@@ -163,6 +164,9 @@ int main(int argc, char *argv[]) {
                     // mark flag
                     flag[index] = 0;
                 } else {
+                    char prompt[10];
+                    sprintf(prompt, "user%02d:", index + 1);
+                    bytes_read = add_prompt(bufs[bid], bytes_read, prompt);
                     // bytes have been read into bufs, now add write to socket sqe
                     for (int i = 0; i < MAX_CONNECTIONS; ++i) {
                         if (flag[i] && client[i] != conn_i.fd) {
@@ -171,10 +175,6 @@ int main(int argc, char *argv[]) {
                     }
                     // add a new read for the existing connection
                     add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-                    // server
-                    strncpy(message, bufs[bid], bytes_read);
-                    message[bytes_read] = '\0';
-                    printf("user%02d:%s", index + 1, message);
                 }
             } else if (type == WRITE) {
                 // write has been completed, first re-add the buffer
@@ -208,6 +208,33 @@ int find_user(int fd) {
         }
     }
     return -1;
+}
+
+int add_prompt(char *buffer, int len, char *prompt) {
+    char message[MAX_MESSAGE_LEN];
+    // split
+    int pos = 0;
+    int start = 0;
+    for (int i = 0; i < len; ++i) {
+        if (buffer[i] == '\n') {
+            strncpy(message + start, prompt, 7);
+            start += 7;
+            int singleMsgLen = i - pos + 1;
+            strncpy(message + start, buffer + pos, singleMsgLen);
+            pos = i + 1;
+            start += singleMsgLen;
+        }
+    }
+    if (pos != len) {
+        strncpy(message + start, prompt, 7);
+        start += 7;
+        int length = len - pos;
+        strncpy(message + start, buffer + pos, length);
+        start += length;
+    }
+    message[start] = '\0';
+    strncpy(buffer, message, start + 1);
+    return start + 1;
 }
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags) {
