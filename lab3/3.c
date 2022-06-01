@@ -150,12 +150,17 @@ int main(int argc, char **argv) {
                 }
 
                 // add new user
-                for (int i = 0; i < MAX_USER_NUM; ++i) {
+                int i;
+                for (i = 0; i < MAX_USER_NUM; ++i) {
                     if (!flag[i]) {
                         flag[i] = 1;
                         client[i] = new_fd;
                         break;
                     }
+                }
+                if (i == MAX_USER_NUM) {
+                    perror("max user");
+                    return 1;
                 }
             } else { // recv or exit
                 for (int i = 0; i < MAX_USER_NUM; ++i) {

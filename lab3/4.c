@@ -157,13 +157,18 @@ int main(int argc, char **argv) {
                     perror("accept");
                     return 1;
                 }
-                for (int j = 0; j < MAX_USER_NUM; ++j) {
+                int j;
+                for (j = 0; j < MAX_USER_NUM; ++j) {
                     if (!flag[j]) {
                         addfd(epoll_fd, new_fd, j);
                         flag[j] = 1;
                         client[j] = new_fd;
                         break;
                     }
+                }
+                if (j == MAX_USER_NUM) {
+                    perror("max user");
+                    return 1;
                 }
             } else if (events[i].events & EPOLLIN) { // recv
                 handle_chat(events[i].data.u32);
