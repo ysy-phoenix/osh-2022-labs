@@ -13,4 +13,4 @@ CCFLAGS ?= -Wall -O2 -D_GNU_SOURCE -luring
 5: 5.c
 	$(CC) 5.c -o 5  ${CCFLAGS}
 clean:
-	$(RM) 1 2 3 4
+	$(RM) 1 2 3 4 5
