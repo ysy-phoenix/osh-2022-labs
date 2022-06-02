@@ -160,7 +160,6 @@ int main(int argc, char **argv) {
                 }
                 if (i == MAX_USER_NUM) {
                     perror("max user");
-                    return 1;
                 }
             } else { // recv or exit
                 for (int i = 0; i < MAX_USER_NUM; ++i) {

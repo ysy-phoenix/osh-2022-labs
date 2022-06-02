@@ -201,7 +201,6 @@ int main(int argc, char **argv) {
         // max user
         if (cnt == MAX_USER_NUM) {
             perror("max user");
-            return 1;
         }
     }
 

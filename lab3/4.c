@@ -168,7 +168,6 @@ int main(int argc, char **argv) {
                 }
                 if (j == MAX_USER_NUM) {
                     perror("max user");
-                    return 1;
                 }
             } else if (events[i].events & EPOLLIN) { // recv
                 handle_chat(events[i].data.u32);

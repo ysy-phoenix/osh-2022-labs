@@ -197,7 +197,7 @@ void new_client(int fd) {
     }
     if (i == MAX_CONNECTIONS) {
         perror("max user");
-        exit(1);
+        return;
     }
 }
 
